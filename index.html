@@ -110,7 +110,7 @@
 </head>
 <body>
 <button class="gear" onclick="openSettings()" title="Settings">⚙</button>
-<div class="src" id="srcLabel">● Sample data</div>
+<div class="src" id="srcLabel" role="status">● Updating calendar</div>
 <div id="app">
   <header>
     <div class="brand">
@@ -139,7 +139,7 @@
 <div class="overlay" id="overlay">
   <div class="panel">
     <h3>Board Settings</h3>
-    <p>This board reads your <b>Planning Center / Church Center calendar</b> through a free relay feed. Changes apply now (for permanent setup, edit the CONFIG block at the top of the code).</p>
+    <p>This board reads your <b>Planning Center / Church Center calendar</b>. Settings and the last updated calendar are saved on this device.</p>
     <label>Feed URL (Church Center relay)</label>
     <input id="s_feed" placeholder="https://script.google.com/macros/s/…/exec">
     <label>Logo image URL or filename</label>
@@ -180,17 +180,105 @@ const GRADS = [
   "linear-gradient(135deg,#2b5876,#4e4376)"
 ];
 
-const SAMPLE = [
-  {title:"Sunday Worship", start:isoIn(2,9,30), allDay:false, location:"Main Auditorium", desc:"Join us for worship every Sunday morning. Doors open at 9:00.", link:null},
-  {title:"RiverKids Sunday", start:isoIn(2,9,30), allDay:false, location:"RiverKids Wing", desc:"Fun, faith and friends for newborns through 5th grade.", link:null},
-  {title:"Youth Night", start:isoIn(4,18,30), allDay:false, location:"The Loft", desc:"Games, worship and a message — 6th–12th grade welcome.", link:null},
-  {title:"Summer @ the River", start:isoIn(6,17,0), allDay:false, location:"Church Grounds", desc:"Food trucks, music, and family fun all summer long.", link:null},
-  {title:"Baptism Sunday", start:isoIn(9,11,0), allDay:false, location:"Main Auditorium", desc:"Ready to take your next step? Sign up to be baptized.", link:null}
-];
-function isoIn(days,h,m){const d=new Date();d.setDate(d.getDate()+days);d.setHours(h,m,0,0);return d.toISOString();}
-
 let EVENTS=[], idx=0, timer=null;
+let savedEvents=[], lastUpdated=0, failures=0, refreshTimer=null;
+let activeRequest=null, requestVersion=0, renderedState=null, feedState="loading";
+const SETTINGS_KEY="river-board-settings-v1";
+const CACHE_PREFIX="river-board-calendar-v1:";
 const $=id=>document.getElementById(id);
+
+function restoreSettings(){
+  try{
+    const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if(!settings || typeof settings!=="object") return;
+    ["feedUrl","logoUrl","churchCenterUrl"].forEach(key=>{
+      if(typeof settings[key]==="string") CONFIG[key]=settings[key];
+    });
+    if(Number.isFinite(settings.rotateSeconds)){
+      CONFIG.rotateSeconds=Math.min(60,Math.max(3,settings.rotateSeconds));
+    }
+  }catch(err){ console.warn("Saved settings unavailable:",err); }
+}
+function normalizeEvents(data){
+  const items=Array.isArray(data)?data:(data && data.events);
+  if(!Array.isArray(items)) throw new Error("Calendar response is not an event list");
+  return items.map(e=>{
+    if(!e || typeof e.start!=="string" || !Number.isFinite(Date.parse(e.start))){
+      throw new Error("Calendar response contains an invalid event");
+    }
+    return {
+      title:String(e.title||e.summary||"Event"), start:e.start, allDay:!!e.allDay,
+      location:String(e.location||""),
+      desc:String(e.desc||e.description||"").replace(/<[^>]+>/g,"").trim(),
+      link:typeof e.link==="string"?e.link:null
+    };
+  });
+}
+function restoreCalendar(){
+  savedEvents=[]; lastUpdated=0; failures=0; renderedState=null;
+  try{
+    const cached=JSON.parse(localStorage.getItem(CACHE_PREFIX+CONFIG.feedUrl.trim()));
+    if(!cached || !Number.isFinite(cached.updatedAt) || cached.updatedAt<=0) return;
+    const events=normalizeEvents(cached.events);
+    savedEvents=events; lastUpdated=cached.updatedAt;
+  }catch(err){ console.warn("Saved calendar unavailable:",err); }
+}
+function cacheCalendar(){
+  try{
+    localStorage.setItem(CACHE_PREFIX+CONFIG.feedUrl.trim(),
+      JSON.stringify({events:savedEvents,updatedAt:lastUpdated}));
+  }catch(err){ console.warn("Calendar could not be saved on this device:",err); }
+}
+function renderCalendar(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  // Drop yesterday's events before collapsing recurring entries, including while offline.
+  let next=savedEvents.filter(e=>new Date(e.start)>=today)
+    .sort((a,b)=>new Date(a.start)-new Date(b.start));
+  if(CONFIG.collapseRecurring){
+    const seen=new Set();
+    next=next.filter(e=>{
+      const key=e.title.trim().toLowerCase();
+      if(seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }
+  const state=JSON.stringify([next,today.getTime(),!!lastUpdated,CONFIG.churchCenterUrl]);
+  if(state===renderedState) return; // A failed or unchanged refresh must not interrupt rotation.
+  const selected=EVENTS[idx];
+  EVENTS=next;
+  let nextIndex=selected?EVENTS.findIndex(e=>e.title===selected.title && e.start===selected.start):0;
+  if(nextIndex<0) nextIndex=0;
+  idx=0;
+  buildFeature(); buildRail(); buildTicker();
+  if(EVENTS.length) goTo(nextIndex);
+  else startRotation();
+  renderedState=state;
+}
+function setFeedState(state){
+  feedState=state;
+  const el=$("srcLabel");
+  const updated=lastUpdated?new Date(lastUpdated).toLocaleString([],
+    {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
+  if(state==="live"){
+    el.textContent="● Live · Updated "+updated;
+    el.style.color="#7df7a8"; el.style.opacity=".85";
+  }else{
+    el.textContent=lastUpdated?
+      "● Saved calendar · Updated "+updated+" · Retrying":
+      state==="loading"?"● Updating calendar":"● Calendar unavailable · Retrying";
+    el.style.color=state==="loading"?"":"#ffce83";
+    el.style.opacity=".95";
+  }
+}
+function scheduleRefresh(delay){
+  clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(()=>load(),delay);
+}
+function cancelRequest(){
+  requestVersion++;
+  if(activeRequest) activeRequest.abort();
+  activeRequest=null;
+}
 
 function tick(){
   const n=new Date();
@@ -210,32 +298,37 @@ function setLogo(){
 }
 
 async function load(){
-  if(CONFIG.feedUrl && CONFIG.feedUrl.trim()){
-    try{
-      const r=await fetch(CONFIG.feedUrl.trim());
-      if(!r.ok) throw new Error("HTTP "+r.status);
-      const data=await r.json();
-      const items = Array.isArray(data) ? data : (data.events||[]);
-      EVENTS = items.map(e=>({
-        title: e.title||e.summary||"Event",
-        start: e.start, allDay: !!e.allDay,
-        location: e.location||"",
-        desc: (e.desc||e.description||"").replace(/<[^>]+>/g,"").trim(),
-        link: e.link||null
-      })).filter(e=>e.start);
-      if(!EVENTS.length){ EVENTS=SAMPLE.slice(); setSrc(false,"Feed empty — showing sample"); }
-      else setSrc(true);
-    }catch(err){ console.warn("Feed fetch failed:",err); EVENTS=SAMPLE.slice(); setSrc(false,"Feed error — showing sample"); }
-  } else { EVENTS=SAMPLE.slice(); setSrc(false,"Sample data"); }
-  EVENTS.sort((a,b)=> new Date(a.start)-new Date(b.start));
-  if(CONFIG.collapseRecurring){
-    const seen=new Set(), out=[];
-    for(const e of EVENTS){ const k=(e.title||"").trim().toLowerCase(); if(seen.has(k)) continue; seen.add(k); out.push(e); }
-    EVENTS=out;
+  if(activeRequest) return;
+  clearTimeout(refreshTimer);
+  renderCalendar();
+  if(navigator.onLine===false || !CONFIG.feedUrl.trim()){
+    setFeedState("saved"); scheduleRefresh(30000); return;
   }
-  idx=0; buildFeature(); buildRail(); buildTicker(); startRotation();
+  const version=++requestVersion;
+  const controller=new AbortController();
+  activeRequest=controller;
+  const timeout=setTimeout(()=>controller.abort(),12000);
+  let retryDelay=CONFIG.refreshMinutes*60*1000;
+  try{
+    const r=await fetch(CONFIG.feedUrl.trim(),{signal:controller.signal,cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const events=normalizeEvents(await r.json());
+    if(version!==requestVersion) return;
+    savedEvents=events; lastUpdated=Date.now(); failures=0;
+    cacheCalendar(); renderCalendar(); setFeedState("live");
+  }catch(err){
+    if(version!==requestVersion) return;
+    console.warn("Calendar update failed; keeping saved events:",err);
+    failures++;
+    retryDelay=Math.min(300000,15000*Math.pow(2,Math.min(failures-1,5)));
+    renderCalendar(); setFeedState("saved");
+  }finally{
+    clearTimeout(timeout);
+    if(version===requestVersion){
+      activeRequest=null; scheduleRefresh(retryDelay);
+    }
+  }
 }
-function setSrc(ok,msg){ const el=$("srcLabel"); el.innerHTML=ok?"<span style='color:#7df7a8'>● Live · Church Center</span>":"● "+msg; }
 
 function relLabel(iso,allDay){
   const d=new Date(iso), now=new Date();
@@ -254,6 +347,15 @@ function fmtFull(iso,allDay){
 }
 function buildFeature(){
   const f=$("feature"); f.innerHTML="";
+  if(!EVENTS.length){
+    f.innerHTML=`<div class="slide active" style="background:${GRADS[5]}">
+      <div class="kicker">The River Church</div>
+      <div><h1 class="ftitle">${lastUpdated?"No upcoming events":"Calendar temporarily unavailable"}</h1>
+      <div class="desc">${lastUpdated?"Check Church Center for the latest updates.":"We’re reconnecting. Please check Church Center for upcoming events."}</div></div>
+      <div class="cta"><a class="btn" href="${esc(CONFIG.churchCenterUrl)}" target="_blank" rel="noopener">View calendar →</a></div>
+    </div>`;
+    return;
+  }
   EVENTS.forEach((e,i)=>{
     const s=document.createElement("div");
     s.className="slide"+(i===0?" active":"");
@@ -306,7 +408,9 @@ function buildRail(){
 }
 function buildTicker(){
   const items=EVENTS.map(e=>`<span><b>${esc(e.title)}</b> — ${esc(fmtFull(e.start,e.allDay))}</span>`).join("");
-  const base=`<span>Welcome to <b>The River</b> — scan any code to sign up on Church Center</span>`+items;
+  const base=(EVENTS.length?
+    `<span>Welcome to <b>The River</b> — scan any code to sign up on Church Center</span>`:
+    `<span>Welcome to <b>The River</b> — visit therivr.churchcenter.com/calendar for upcoming events</span>`)+items;
   $("ticker").innerHTML=base+base;
 }
 function startRotation(){
@@ -332,25 +436,41 @@ function openSettings(){
 }
 function closeSettings(){ $("overlay").classList.remove("open"); }
 async function saveSettings(){
+  cancelRequest(); clearTimeout(refreshTimer);
+  const previousFeed=CONFIG.feedUrl.trim();
   CONFIG.feedUrl=$("s_feed").value.trim();
   CONFIG.logoUrl=$("s_logo").value.trim();
   CONFIG.churchCenterUrl=$("s_cc").value.trim()||CONFIG.churchCenterUrl;
-  CONFIG.rotateSeconds=Math.max(3,parseInt($("s_rot").value)||9);
-  const st=$("s_status");
-  if(CONFIG.feedUrl){
-    st.className="status"; st.textContent="Testing feed…"; st.style.display="block";
-    try{ const r=await fetch(CONFIG.feedUrl); if(!r.ok) throw 0;
-      const d=await r.json(); const n=(Array.isArray(d)?d:(d.events||[])).length;
-      st.className="status ok"; st.textContent="✓ Connected — "+n+" upcoming event(s).";
-    }catch(e){ st.className="status warn"; st.textContent="Couldn't reach the feed. Check the web-app URL and that access is set to “Anyone.”"; }
-  }
-  setLogo(); closeSettings(); load();
+  CONFIG.rotateSeconds=Math.min(60,Math.max(3,parseInt($("s_rot").value)||9));
+  try{
+    localStorage.setItem(SETTINGS_KEY,JSON.stringify({
+      feedUrl:CONFIG.feedUrl,logoUrl:CONFIG.logoUrl,
+      churchCenterUrl:CONFIG.churchCenterUrl,rotateSeconds:CONFIG.rotateSeconds
+    }));
+  }catch(err){ console.warn("Settings could not be saved on this device:",err); }
+  if(previousFeed!==CONFIG.feedUrl.trim()) restoreCalendar();
+  renderedState=null;
+  setLogo(); closeSettings(); renderCalendar(); setFeedState("loading");
+  await load();
 }
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
-setLogo(); load();
-setInterval(load, CONFIG.refreshMinutes*60*1000);  // auto-refresh from the calendar
+restoreSettings(); restoreCalendar(); setLogo();
+renderCalendar(); setFeedState("loading"); load();
+window.addEventListener("offline",()=>{
+  cancelRequest(); renderCalendar(); setFeedState("saved"); scheduleRefresh(30000);
+});
+window.addEventListener("online",()=>load());
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){
+    renderCalendar();
+    if(feedState!=="live" || Date.now()-lastUpdated>=CONFIG.refreshMinutes*60*1000) load();
+  }
+});
+// Keep date labels and cached recurring events correct during a long outage.
+setInterval(()=>renderCalendar(),60000);
 </script>
 </body>
 </html>
+
