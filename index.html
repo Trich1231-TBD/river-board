@@ -199,15 +199,38 @@ function restoreSettings(){
     }
   }catch(err){ console.warn("Saved settings unavailable:",err); }
 }
+// Planning Center relays may supply dates without times, or timed timestamps
+// incorrectly marked all-day. Normalize both before rendering or caching.
+function normalizeDate(value, allDay){
+  if(typeof value!=="string" || !value.trim()) return null;
+  const raw=value.trim();
+  const dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw);
+  // A date-only value must not be parsed as UTC (which shifts back a day in Missouri).
+  const result=dateOnly?raw+"T00:00:00":raw;
+  if(!Number.isFinite(Date.parse(result))) return null;
+  if(allDay && /^\d{4}-\d{2}-\d{2}T00:00(?::00(?:\.0+)?)?Z$/.test(raw)){
+    // Midnight UTC from a relay is often an encoded all-day calendar date.
+    return raw.slice(0,10)+"T00:00:00";
+  }
+  return result;
+}
 function normalizeEvents(data){
   const items=Array.isArray(data)?data:(data && data.events);
   if(!Array.isArray(items)) throw new Error("Calendar response is not an event list");
   return items.map(e=>{
-    if(!e || typeof e.start!=="string" || !Number.isFinite(Date.parse(e.start))){
-      throw new Error("Calendar response contains an invalid event");
-    }
+    if(!e || typeof e!=="object") throw new Error("Invalid calendar event");
+    const rawStart=e.start||e.starts_at||e.start_time||e.startDateTime;
+    const rawEnd=e.end||e.ends_at||e.end_time||e.endDateTime;
+    const explicitAllDay=e.allDay===true||e.all_day===true;
+    const startClock=typeof rawStart==="string" && rawStart.match(/T(\d{2}):(\d{2})/);
+    const hasTimedStart=!!startClock && (Number(startClock[1])!==0||Number(startClock[2])!==0);
+    const allDay=(typeof rawStart==="string" && /^\d{4}-\d{2}-\d{2}$/.test(rawStart.trim())) ||
+      (explicitAllDay && !hasTimedStart);
+    const start=normalizeDate(rawStart,allDay);
+    const end=normalizeDate(rawEnd,allDay);
+    if(!start) throw new Error("Calendar response contains an invalid event");
     return {
-      title:String(e.title||e.summary||"Event"), start:e.start, allDay:!!e.allDay,
+      title:String(e.title||e.summary||"Event"),start,end,allDay,
       location:String(e.location||""),
       desc:String(e.desc||e.description||"").replace(/<[^>]+>/g,"").trim(),
       link:typeof e.link==="string"?e.link:null
@@ -231,9 +254,12 @@ function cacheCalendar(){
 }
 function renderCalendar(){
   const today=new Date(); today.setHours(0,0,0,0);
-  // Drop yesterday's events before collapsing recurring entries, including while offline.
-  let next=savedEvents.filter(e=>new Date(e.start)>=today)
-    .sort((a,b)=>new Date(a.start)-new Date(b.start));
+  // Include all events dated today, even after their start time. For multi-day
+  // events, keep the event until the last calendar day it occupies.
+  let next=savedEvents.filter(e=>{
+    const end=e.end?new Date(e.end):new Date(e.start);
+    return end>=today;
+  }).sort((a,b)=>new Date(a.start)-new Date(b.start));
   if(CONFIG.collapseRecurring){
     const seen=new Set();
     next=next.filter(e=>{
