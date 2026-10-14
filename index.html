@@ -481,7 +481,7 @@ async function checkCalendarFeed(){
     const normalized=normalizeEvents(data);
     const today=new Date();today.setHours(0,0,0,0);
     const visible=normalized.filter(e=>new Date(e.end||e.start)>=today);
-    const keywords=/\\b(flood|rush)\\b/i;
+    const keywords=/\b(flood|rush)\b/i;
     const matched=raw.map((e,i)=>({raw:e,event:normalized[i]}))
       .filter(x=>keywords.test(x.event.title));
     const lines=[
@@ -505,10 +505,10 @@ async function checkCalendarFeed(){
       lines.push("Note: repeating entries with the same title may be collapsed to one.");
     }
     lines.push("Other feed events: "+normalized.slice(0,8).map(e=>e.title).join(", "));
-    out.textContent=lines.join("\\n");
+    out.textContent=lines.join("\n");
   }catch(err){
     out.textContent="Unable to inspect feed: "+(err?.message||String(err))+
-      "\\nVerify the feed URL and its sharing/deployment settings.";
+      "\nVerify the feed URL and its sharing/deployment settings.";
   }finally{clearTimeout(timeout);}
 }
 
