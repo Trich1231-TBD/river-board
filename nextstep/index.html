@@ -253,7 +253,21 @@ const status = document.getElementById("status");
 let edited = !!state.msg;
 pname.value = state.name;
 msg.value = state.msg || INVITE(state.name);
-function paintSms() { smsbtn.href = "sms:?&body=" + encodeURIComponent(msg.value); }
+const UA = navigator.userAgent;
+const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/i.test(UA);
+const CAN_TEXT = IS_IOS || IS_ANDROID;
+function paintSms() {
+  const body = encodeURIComponent(msg.value);
+  smsbtn.href = IS_IOS ? "sms:&body=" + body : "sms:?body=" + body;
+}
+if (!CAN_TEXT) {
+  smsbtn.hidden = true;
+  const cb = document.getElementById("copybtn");
+  cb.classList.remove("ghost"); cb.classList.add("primary");
+  status.textContent = "On a computer? Copy the text, then send it from your phone.";
+  status.style.color = "var(--muted)";
+}
 pname.addEventListener("input", () => {
   state.name = pname.value.trim();
   if (!edited) msg.value = INVITE(state.name);
@@ -262,7 +276,7 @@ pname.addEventListener("input", () => {
 msg.addEventListener("input", () => { edited = true; state.msg = msg.value; paintSms(); save(); });
 paintSms();
 document.getElementById("copybtn").addEventListener("click", () => {
-  const done = () => { status.textContent = "Copied. Paste it into a text to your person."; };
+  const done = () => { status.style.color = ""; status.textContent = "Copied. Paste it into a text to your person."; };
   const fallback = () => { msg.focus(); msg.select(); status.textContent = "Text selected. Copy it and paste it into a text."; };
   try { navigator.clipboard.writeText(msg.value).then(done, fallback); } catch (e) { fallback(); }
 });
