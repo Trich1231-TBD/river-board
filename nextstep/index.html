@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blind Spots Next Step</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap">
+<style>
+/* Layout: one narrow phone column read top to bottom; three real steps in order; amber = the blind-spot warning light on a side mirror */
+:root {
+  --bg: #F2F4F6;
+  --surface: #FFFFFF;
+  --ink: #1A2029;
+  --muted: #5B6573;
+  --line: #D9DEE5;
+  --amber: #C97A10;
+  --amber-soft: #FBEBD3;
+  --on-amber: #1A2029;
+  --done: #2F7A57;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --read: "Literata", Georgia, "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151B; --surface: #1A2028; --ink: #E9EDF2; --muted: #9AA5B4; --line: #2C3440;
+    --amber: #F2A93B; --amber-soft: #3A2A12; --on-amber: #11151B; --done: #5DBB8C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151B; --surface: #1A2028; --ink: #E9EDF2; --muted: #9AA5B4; --line: #2C3440;
+  --amber: #F2A93B; --amber-soft: #3A2A12; --on-amber: #11151B; --done: #5DBB8C; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--read); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
+h1, h2, h3, .label, button, .chip, .btn { font-family: var(--display); }
+h1 { font-size: clamp(44px, 13vw, 64px); line-height: 0.95; font-weight: 800; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h2 { font-size: 26px; line-height: 1.15; font-weight: 700; margin: 0; text-wrap: balance; }
+h3 { font-size: 18px; font-weight: 700; margin: 0; }
+p { margin: 0; }
+.label { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+/* Hero */
+.hero { display: flex; flex-direction: column; gap: 18px; }
+.title { display: flex; align-items: center; gap: 0.2em; }
+.mirror { width: 1.05em; height: 0.69em; flex: none; transform: translateY(0.04em); }
+.lede { font-size: 20px; line-height: 1.45; }
+.strands { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.strand { border-top: 3px solid var(--line); padding-top: 8px; font-family: var(--display); font-weight: 700; font-size: 15px; }
+.strand small { display: block; font-family: var(--read); font-weight: 400; font-size: 13px; color: var(--muted); }
+.strand.you { border-color: var(--ink); }
+.strand.god { border-color: var(--amber); }
+.strand.one { border-color: var(--muted); }
+.ref { font-size: 14px; color: var(--muted); }
+
+/* Steps */
+.step { display: flex; flex-direction: column; gap: 16px; }
+.step-head { display: flex; align-items: baseline; gap: 12px; }
+.num { font-family: var(--display); font-weight: 800; font-size: 15px; color: var(--on-amber); background: var(--amber); width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; transform: translateY(-3px); }
+.scripture { font-size: 19px; line-height: 1.55; font-style: italic; border-left: 3px solid var(--amber); padding-left: 16px; }
+.scripture cite { display: block; font-style: normal; font-size: 14px; color: var(--muted); margin-top: 8px; font-family: var(--display); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.private { font-size: 14px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.private svg { flex: none; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { appearance: none; border: 1.5px solid var(--line); background: transparent; color: var(--ink); font-size: 15px; font-weight: 500; padding: 9px 14px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); font-weight: 700; }
+.chip:focus-visible, .btn:focus-visible, .day summary:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.followup { font-size: 16px; }
+
+label.field { display: flex; flex-direction: column; gap: 6px; font-family: var(--display); font-weight: 700; font-size: 14px; }
+input[type="text"], textarea { font: inherit; font-family: var(--read); font-weight: 400; font-size: 16px; color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+textarea { min-height: 150px; resize: vertical; line-height: 1.5; }
+.btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { appearance: none; border: 0; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700; padding: 13px 18px; border-radius: 12px; flex: 1 1 160px; min-height: 48px; }
+.btn.primary { background: var(--amber); color: var(--on-amber); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+.status { font-size: 14px; color: var(--done); min-height: 1.4em; }
+
+/* Week */
+.progress { display: flex; gap: 6px; }
+.progress span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.progress span.on { background: var(--done); }
+.days { display: flex; flex-direction: column; gap: 10px; }
+.day { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.day summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; gap: 12px; border-radius: 14px; }
+.day summary::-webkit-details-marker { display: none; }
+.dname { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); width: 38px; flex: none; }
+.dtitle { font-family: var(--display); font-weight: 700; font-size: 18px; flex: 1; min-width: 0; }
+.tick { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); flex: none; display: grid; place-items: center; }
+.day.is-done .tick { background: var(--done); border-color: var(--done); }
+.day.is-done .tick::after { content: ""; width: 10px; height: 5px; border-left: 2.5px solid var(--surface); border-bottom: 2.5px solid var(--surface); transform: rotate(-45deg) translate(1px, -1px); }
+.dbody { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.read { font-family: var(--display); font-weight: 700; font-size: 14px; color: var(--amber); }
+.q { font-size: 17px; }
+.donebtn { align-self: flex-start; flex: none; }
+
+.checkin { display: flex; flex-direction: column; gap: 10px; }
+.checkin ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+
+.remind { border: 1.5px dashed var(--amber); background: var(--amber-soft); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.setup { font-family: var(--display); font-size: 13px; color: var(--muted); }
+footer { font-size: 13px; color: var(--muted); text-align: center; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<main class="wrap">
+
+  <header class="hero">
+    <p class="label">Your next step from Sunday</p>
+    <h1 class="title">Blind Spots <svg class="mirror" viewBox="0 0 92 60" aria-hidden="true" focusable="false">
+      <path d="M8 10 Q8 4 14 4 L78 4 Q86 4 86 12 L84 46 Q83 56 72 56 L18 56 Q8 56 8 46 Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/>
+      <path d="M47 20 L59 40 L35 40 Z" fill="var(--amber)"/>
+      <circle cx="47" cy="35" r="2" fill="var(--on-amber)"/>
+      <rect x="46" y="24" width="2" height="8" rx="1" fill="var(--on-amber)"/>
+    </svg></h1>
+    <p class="lede">Everyone has them. Nobody can see their own. You can't fix what you can't see from where you sit, so this week, invite God and one other person to help you see.</p>
+    <div class="strands" role="list" aria-label="A cord of three strands">
+      <div class="strand you" role="listitem">You<small>show up honest</small></div>
+      <div class="strand god" role="listitem">God<small>searches your heart</small></div>
+      <div class="strand one" role="listitem">One person<small>walks with you</small></div>
+    </div>
+    <p class="ref">"A cord of three strands is not quickly broken." Ecclesiastes 4:12</p>
+  </header>
+
+  <section class="step" aria-labelledby="s1">
+    <div class="step-head"><span class="num">1</span><h2 id="s1">Pray it</h2></div>
+    <p>God already sees what you can't. Pray this slowly, out loud if you can.</p>
+    <blockquote class="scripture">Search me, God, and know my heart; test me and know my anxious thoughts. See if there is any offensive way in me, and lead me in the way everlasting.<cite>Psalm 139:23-24 NIV</cite></blockquote>
+    <div class="panel">
+      <h3>Where might I have a blind spot?</h3>
+      <p class="private"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>Private. Your answer stays on this phone. Nobody else sees it.</p>
+      <div class="chips" id="areas">
+        <button class="chip" type="button" aria-pressed="false" data-area="time">Time with God</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="relationships">Relationships</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="marriage">Marriage or family</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="words">My words</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="money">Money</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="habits">Habits</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="thoughts">Thought life</button>
+        <button class="chip" type="button" aria-pressed="false" data-area="unsure">Not sure yet</button>
+      </div>
+      <p class="followup" id="followup">Tap one. If you're not sure, that's a good place to start too.</p>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="s2">
+    <div class="step-head"><span class="num">2</span><h2 id="s2">Name your strand</h2></div>
+    <blockquote class="scripture">Two are better than one... If either of them falls down, one can help the other up.<cite>Ecclesiastes 4:9-10 NIV</cite></blockquote>
+    <p>Who's one person who could help you see what you can't? Same gender, someone you trust, someone who will be honest with you. Ask them before you leave the parking lot.</p>
+    <div class="panel">
+      <label class="field" for="pname">Their first name
+        <input type="text" id="pname" placeholder="Mark" autocomplete="off">
+      </label>
+      <label class="field" for="msg">Your text (edit it however you want)
+        <textarea id="msg"></textarea>
+      </label>
+      <div class="btns">
+        <a class="btn primary" id="smsbtn" href="sms:">Open in Messages</a>
+        <button class="btn ghost" type="button" id="copybtn">Copy text</button>
+      </div>
+      <p class="status" id="status" aria-live="polite"></p>
+    </div>
+    <div class="panel checkin">
+      <h3>When you check in, ask each other</h3>
+      <ol>
+        <li>How has your time with God been this week?</li>
+        <li>Where did you struggle?</li>
+        <li>Is there anything you see in me that I might not?</li>
+        <li>How can I pray for you?</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="s3">
+    <div class="step-head"><span class="num">3</span><h2 id="s3">Live it this week</h2></div>
+    <p>Two minutes a day. One passage, one question. Tap a day to open it.</p>
+    <div class="progress" id="progress" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="days" id="days"></div>
+  </section>
+
+  <section class="remind" aria-labelledby="r1">
+    <h3 id="r1">Want a midweek nudge?</h3>
+    <p>Get one short text or email on Wednesday with a reminder to check in with your person. That's it.</p>
+    <div class="btns"><a class="btn primary" id="remindbtn" href="#" target="_blank" rel="noopener">Send me a reminder</a></div>
+      </section>
+
+  <footer>Blind Spots · Point of View series</footer>
+</main>
+
+<script>
+// ---- Weekly content: this block is what changes each Sunday ----
+const REMINDER_FORM_URL = ""; // Church Center / Planning Center form link
+const DAYS = [
+  { d: "Mon", title: "Ask", read: "Psalm 139:1-6", q: "God already knows you completely. What part of your life have you been keeping at arm's length from Him? Pray verses 23-24 again and name it." },
+  { d: "Tue", title: "Listen", read: "James 1:22-25", q: "Is there something you keep hearing but not doing? Write it down. Don't fix it yet, just stop looking away from it." },
+  { d: "Wed", title: "Reach", read: "Ecclesiastes 4:9-12", q: "Did you send that text? If not, who's one name? Send it today. If you did, check in with them." },
+  { d: "Thu", title: "Receive", read: "Proverbs 27:17", q: "When someone points out a blind spot, do you defend or listen? Ask one person you trust: \"Is there anything you see in me that I might not?\"" },
+  { d: "Fri", title: "Step", read: "Galatians 6:1-2", q: "What's one small step you'll take next week because of what you saw this week? Tell your person what it is." }
+];
+const INVITE = (name) => `Hey${name ? " " + name : ""}, today's message at church was about blind spots. Everyone has them and nobody can see their own. Would you be willing to check in with me once a week for the next few weeks? I want someone in my corner.`;
+const FOLLOW = {
+  time: "Start small. Five minutes with God before your phone tomorrow morning.",
+  relationships: "Think of one relationship that feels off. Ask God what part of it is yours.",
+  marriage: "Ask your spouse or a family member one honest question this week, and just listen.",
+  words: "Notice your words for one day. Where do they build up, and where do they cut?",
+  money: "Look at last month's spending. Ask God what it says about where your heart is.",
+  habits: "Name the habit out loud to God. Then name it to one trusted person.",
+  thoughts: "When the thought shows up this week, pray verse 23 right then. Bring it into the light.",
+  unsure: "That's honest. Pray the verse every day this week and pay attention to what comes up."
+};
+// ---------------------------------------------------------------
+
+const store = {
+  get(k, f) { try { const v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch (e) { return f; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+const KEY = "blindspots-v1";
+const state = Object.assign({ area: null, done: [], name: "", msg: "" }, store.get(KEY, {}));
+const save = () => store.set(KEY, state);
+
+// Step 1: private area
+const chips = document.querySelectorAll(".chip");
+const followup = document.getElementById("followup");
+function paintArea() {
+  chips.forEach(c => c.setAttribute("aria-pressed", String(c.dataset.area === state.area)));
+  if (state.area) followup.textContent = FOLLOW[state.area];
+}
+chips.forEach(c => c.addEventListener("click", () => {
+  state.area = state.area === c.dataset.area ? null : c.dataset.area;
+  if (!state.area) followup.textContent = "Tap one. If you're not sure, that's a good place to start too.";
+  paintArea(); save();
+}));
+paintArea();
+
+// Step 2: invite text
+const pname = document.getElementById("pname");
+const msg = document.getElementById("msg");
+const smsbtn = document.getElementById("smsbtn");
+const status = document.getElementById("status");
+let edited = !!state.msg;
+pname.value = state.name;
+msg.value = state.msg || INVITE(state.name);
+function paintSms() { smsbtn.href = "sms:?&body=" + encodeURIComponent(msg.value); }
+pname.addEventListener("input", () => {
+  state.name = pname.value.trim();
+  if (!edited) msg.value = INVITE(state.name);
+  paintSms(); save();
+});
+msg.addEventListener("input", () => { edited = true; state.msg = msg.value; paintSms(); save(); });
+paintSms();
+document.getElementById("copybtn").addEventListener("click", () => {
+  const done = () => { status.textContent = "Copied. Paste it into a text to your person."; };
+  const fallback = () => { msg.focus(); msg.select(); status.textContent = "Text selected. Copy it and paste it into a text."; };
+  try { navigator.clipboard.writeText(msg.value).then(done, fallback); } catch (e) { fallback(); }
+});
+smsbtn.addEventListener("click", () => {
+  status.textContent = "If Messages didn't open, use Copy text instead.";
+});
+
+// Step 3: week
+const daysEl = document.getElementById("days");
+const bars = document.querySelectorAll("#progress span");
+DAYS.forEach((day, i) => {
+  const el = document.createElement("details");
+  el.className = "day";
+  el.innerHTML = `<summary><span class="dname">${day.d}</span><span class="dtitle">${day.title}</span><span class="tick" aria-hidden="true"></span></summary>
+    <div class="dbody"><p class="read">Read ${day.read}</p><p class="q"></p><button class="btn ghost donebtn" type="button" id="done-${i}"></button></div>`;
+  el.querySelector(".q").textContent = day.q;
+  daysEl.appendChild(el);
+  el.querySelector("button").addEventListener("click", () => {
+    const k = state.done.indexOf(i);
+    if (k === -1) state.done.push(i); else state.done.splice(k, 1);
+    paintWeek(); save();
+  });
+});
+function paintWeek() {
+  daysEl.querySelectorAll(".day").forEach((el, i) => {
+    const on = state.done.includes(i);
+    el.classList.toggle("is-done", on);
+    el.querySelector("button").textContent = on ? "Done. Tap to undo" : "Mark done";
+  });
+  bars.forEach((b, i) => b.classList.toggle("on", i < state.done.length));
+}
+paintWeek();
+
+// Reminder opt-in
+const remind = document.getElementById("remindbtn");
+if (REMINDER_FORM_URL) { remind.href = REMINDER_FORM_URL; }
+else { document.querySelector(".remind").hidden = true; }
+</script>
+
+</body>
+</html>
